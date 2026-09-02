@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - StockManager</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="index.html" class="logo">📦 StockManager</a>
+            </div>
+            <div class="nav-right">
+                <button class="theme-toggle" id="themeToggle" title="Toggle Dark/Light Mode">
+                    <span id="themeIcon">🌙</span>
+                </button>
+                <div class="nav-links">
+                    <a href="inventory.html" class="btn-small">Inventory</a>
+                    <button id="logoutBtn" class="btn-small">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Profile Container -->
+    <div class="container">
+        <div class="page-header">
+            <h1>User Profile</h1>
+            <p>Manage your account information</p>
+        </div>
+
+        <!-- Profile Card -->
+        <section class="profile-section">
+            <div class="profile-card">
+                <div class="profile-header">
+                    <div class="profile-avatar">👤</div>
+                    <h2 id="profileShopName">Shop Name</h2>
+                </div>
+
+                <div class="profile-info">
+                    <div class="info-group">
+                        <label>User ID</label>
+                        <p id="profileUserId" class="info-value">ID-0000</p>
+                        <button class="btn-copy" onclick="copyToClipboard('profileUserId')">Copy</button>
+                    </div>
+
+                    <div class="info-group">
+                        <label>Email</label>
+                        <p id="profileEmail" class="info-value">user@example.com</p>
+                    </div>
+
+                    <div class="info-group">
+                        <label>Phone Number</label>
+                        <p id="profilePhone" class="info-value">+1234567890</p>
+                    </div>
+
+                    <div class="info-group">
+                        <label>Member Since</label>
+                        <p id="profileMemberSince" class="info-value">2024</p>
+                    </div>
+                </div>
+
+                <div class="profile-stats">
+                    <div class="stat">
+                        <span class="stat-number" id="totalProducts">0</span>
+                        <span class="stat-label">Products</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number" id="totalValue">$0.00</span>
+                        <span class="stat-label">Total Value</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number" id="totalItems">0</span>
+                        <span class="stat-label">Items in Stock</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Account Settings Section -->
+        <section class="settings-section">
+            <h2>Account Settings</h2>
+            
+            <div class="settings-card">
+                <h3>Change Password</h3>
+                <form id="changePasswordForm" class="form">
+                    <div class="form-group">
+                        <label for="oldPassword">Current Password</label>
+                        <input type="password" id="oldPassword" name="oldPassword" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="newPassword">New Password</label>
+                        <input type="password" id="newPassword" name="newPassword" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirmNewPassword">Confirm Password</label>
+                        <input type="password" id="confirmNewPassword" name="confirmNewPassword" required>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Update Password</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Danger Zone -->
+        <section class="danger-zone">
+            <h2>Danger Zone</h2>
+            <div class="danger-card">
+                <h3>Delete Account</h3>
+                <p>Once you delete your account, there is no going back. Please be certain.</p>
+                <button id="deleteAccountBtn" class="btn btn-danger">Delete Account</button>
+            </div>
+        </section>
+
+        <!-- Message Display -->
+        <div id="profileMessage" class="message"></div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content modal-small">
+            <h2>Confirm Action</h2>
+            <p id="confirmMessage">Are you sure?</p>
+            <div class="modal-buttons">
+                <button id="confirmYes" class="btn btn-danger">Yes, Delete</button>
+                <button id="confirmNo" class="btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

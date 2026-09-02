@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory - StockManager</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="index.html" class="logo">📦 StockManager</a>
+            </div>
+            <div class="nav-right">
+                <button class="theme-toggle" id="themeToggle" title="Toggle Dark/Light Mode">
+                    <span id="themeIcon">🌙</span>
+                </button>
+                <div class="nav-links">
+                    <a href="profile.html" class="btn-small">Profile</a>
+                    <button id="logoutBtn" class="btn-small">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Inventory Container -->
+    <div class="container">
+        <div class="page-header">
+            <h1>Inventory Management</h1>
+            <p>Manage your products and stock levels</p>
+        </div>
+
+        <!-- Add Product Form -->
+        <section class="add-product-section">
+            <h2>Add New Product</h2>
+            <form id="addProductForm" class="form form-horizontal">
+                <div class="form-group">
+                    <label for="productName">Product Name</label>
+                    <input type="text" id="productName" name="productName" required placeholder="Enter product name">
+                </div>
+
+                <div class="form-group">
+                    <label for="productDescription">Description</label>
+                    <input type="text" id="productDescription" name="productDescription" placeholder="Product description">
+                </div>
+
+                <div class="form-group">
+                    <label for="productPrice">Price</label>
+                    <input type="number" id="productPrice" name="productPrice" required placeholder="0.00" step="0.01">
+                </div>
+
+                <div class="form-group">
+                    <label for="productQuantity">Quantity</label>
+                    <input type="number" id="productQuantity" name="productQuantity" required placeholder="0" min="0">
+                </div>
+
+                <div class="form-group">
+                    <label for="productCategory">Category</label>
+                    <input type="text" id="productCategory" name="productCategory" placeholder="e.g., Electronics">
+                </div>
+
+                <button type="submit" class="btn btn-primary">Add Product</button>
+            </form>
+        </section>
+
+        <!-- Search and Filter -->
+        <section class="search-section">
+            <input type="text" id="searchInput" class="search-box" placeholder="Search products...">
+            <div class="filter-controls">
+                <select id="categoryFilter" class="filter-select">
+                    <option value="">All Categories</option>
+                </select>
+            </div>
+        </section>
+
+        <!-- Products Table -->
+        <section class="products-section">
+            <h2>Your Products</h2>
+            <div class="table-responsive">
+                <table id="productsTable" class="products-table">
+                    <thead>
+                        <tr>
+                            <th>Product ID</th>
+                            <th>Name</th>
+                            <th>Category</th>
+                            <th>Price</th>
+                            <th>Quantity</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productsBody">
+                        <!-- Products will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+            <div id="noProducts" class="no-products">
+                <p>No products added yet. Create your first product above!</p>
+            </div>
+        </section>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="closeModal">&times;</span>
+            <h2>Edit Product</h2>
+            <form id="editProductForm" class="form">
+                <input type="hidden" id="editProductId">
+                
+                <div class="form-group">
+                    <label for="editProductName">Product Name</label>
+                    <input type="text" id="editProductName" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="editProductDescription">Description</label>
+                    <input type="text" id="editProductDescription">
+                </div>
+
+                <div class="form-group">
+                    <label for="editProductPrice">Price</label>
+                    <input type="number" id="editProductPrice" required step="0.01">
+                </div>
+
+                <div class="form-group">
+                    <label for="editProductQuantity">Quantity</label>
+                    <input type="number" id="editProductQuantity" required min="0">
+                </div>
+
+                <div class="form-group">
+                    <label for="editProductCategory">Category</label>
+                    <input type="text" id="editProductCategory">
+                </div>
+
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Message Display -->
+    <div id="inventoryMessage" class="message"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
