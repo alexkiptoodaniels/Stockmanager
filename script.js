@@ -5,8 +5,8 @@
 // Import Supabase (make sure to add this script tag in HTML head)
 // <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
-const SUPABASE_URL = 'sb_publishable_XVoEZjP2Mx3vdW6p-pb8vQ_olu9x5SE';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9vdmxidGRodWh2c3JhZnp1enVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI4NzYwOTIsImV4cCI6MjA5ODQ1MjA5Mn0.qrNku4yGJabmVaePNGjDgB5ZqTXhGa76JfrTd-my0Xw';
+const SUPABASE_URL = 'https://oovlbtdhuhvsrafzuzuc.supabase.co/rest/v1/';
+const SUPABASE_ANON_KEY = 'sb_publishable_XVoEZjP2Mx3vdW6p-pb8vQ_olu9x5SE';
 
 // Initialize Supabase client
 const { createClient } = supabase;
