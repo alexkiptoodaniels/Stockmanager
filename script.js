@@ -1,13 +1,55 @@
 // ============================================
+// SUPABASE INITIALIZATION
+// ============================================
+
+// Import Supabase (make sure to add this script tag in HTML head)
+// <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
+const SUPABASE_URL = 'https://your-project-url.supabase.co';
+const SUPABASE_ANON_KEY = 'your-anon-key';
+
+// Initialize Supabase client
+const { createClient } = supabase;
+const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Global variable for current session
+let currentSession = null;
+let currentUser = null;
+
+// ============================================
 // INITIALIZATION & THEME MANAGEMENT
 // ============================================
 
-// Initialize theme on page load
-document.addEventListener('DOMContentLoaded', function() {
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', async function() {
     initializeTheme();
+    await initializeSupabase();
     checkAuthStatus();
     initializePageContent();
 });
+
+async function initializeSupabase() {
+    try {
+        // Check if user already has active session
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        currentSession = session;
+        
+        if (session) {
+            // Fetch user data from database
+            const { data: userData, error } = await supabaseClient
+                .from('users')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+            
+            if (userData) {
+                currentUser = userData;
+            }
+        }
+    } catch (error) {
+        console.error('Supabase initialization error:', error);
+    }
+}
 
 function initializeTheme() {
     const theme = localStorage.getItem('theme') || 'light';
@@ -45,17 +87,16 @@ document.addEventListener('click', function(e) {
 // AUTHENTICATION & USER MANAGEMENT
 // ============================================
 
-function generateUserId() {
+function generateUserDisplayId() {
     const timestamp = Date.now().toString(36).toUpperCase();
     const random = Math.random().toString(36).substring(2, 8).toUpperCase();
     return `ID-${timestamp}${random}`.substring(0, 12);
 }
 
-function checkAuthStatus() {
-    const currentUser = localStorage.getItem('currentUser');
+async function checkAuthStatus() {
     const currentPage = window.location.pathname.split('/').pop() || 'index.html';
 
-    if (!currentUser) {
+    if (!currentSession) {
         // Not logged in
         if (currentPage === 'inventory.html' || currentPage === 'profile.html') {
             window.location.href = 'login.html';
@@ -76,9 +117,17 @@ function setupLogoutButtons() {
     });
 }
 
-function logout() {
-    localStorage.removeItem('currentUser');
-    window.location.href = 'index.html';
+async function logout() {
+    try {
+        const { error } = await supabaseClient.auth.signOut();
+        if (error) throw error;
+        
+        currentSession = null;
+        currentUser = null;
+        window.location.href = 'index.html';
+    } catch (error) {
+        showMessage('profileMessage', 'Logout error: ' + error.message, 'error');
+    }
 }
 
 // ============================================
@@ -87,7 +136,7 @@ function logout() {
 
 const signupForm = document.getElementById('signupForm');
 if (signupForm) {
-    signupForm.addEventListener('submit', function(e) {
+    signupForm.addEventListener('submit', async function(e) {
         e.preventDefault();
 
         const email = document.getElementById('email').value.trim();
@@ -112,33 +161,44 @@ if (signupForm) {
             return;
         }
 
-        // Check if email already exists
-        const users = JSON.parse(localStorage.getItem('users')) || [];
-        if (users.some(user => user.email === email)) {
-            showMessage('signupMessage', 'Email already registered', 'error');
-            return;
+        try {
+            // Sign up with Supabase Auth
+            const { data: { user }, error: authError } = await supabaseClient.auth.signUp({
+                email: email,
+                password: password
+            });
+
+            if (authError) throw authError;
+
+            // Create user profile in database
+            const userDisplayId = generateUserDisplayId();
+            const { data: userData, error: dbError } = await supabaseClient
+                .from('users')
+                .insert([{
+                    id: user.id,
+                    email: email,
+                    phone: phone,
+                    shop_name: shopName,
+                    display_id: userDisplayId,
+                    created_at: new Date().toISOString()
+                }])
+                .select()
+                .single();
+
+            if (dbError) throw dbError;
+
+            // Set up session
+            currentSession = { user: user };
+            currentUser = userData;
+
+            showMessage('signupMessage', 'Account created successfully! Redirecting...', 'success');
+
+            setTimeout(() => {
+                window.location.href = 'profile.html';
+            }, 2000);
+        } catch (error) {
+            showMessage('signupMessage', 'Signup error: ' + error.message, 'error');
         }
-
-        // Create new user
-        const newUser = {
-            id: generateUserId(),
-            email: email,
-            phone: phone,
-            shopName: shopName,
-            password: password, // In production, this should be hashed
-            createdAt: new Date().toISOString(),
-            products: []
-        };
-
-        users.push(newUser);
-        localStorage.setItem('users', JSON.stringify(users));
-        localStorage.setItem('currentUser', JSON.stringify(newUser));
-
-        showMessage('signupMessage', 'Account created successfully! Redirecting...', 'success');
-
-        setTimeout(() => {
-            window.location.href = 'profile.html';
-        }, 2000);
     });
 }
 
@@ -148,26 +208,42 @@ if (signupForm) {
 
 const loginForm = document.getElementById('loginForm');
 if (loginForm) {
-    loginForm.addEventListener('submit', function(e) {
+    loginForm.addEventListener('submit', async function(e) {
         e.preventDefault();
 
         const email = document.getElementById('loginEmail').value.trim();
         const password = document.getElementById('loginPassword').value;
 
-        const users = JSON.parse(localStorage.getItem('users')) || [];
-        const user = users.find(u => u.email === email && u.password === password);
+        try {
+            // Sign in with Supabase Auth
+            const { data: { session }, error: authError } = await supabaseClient.auth.signInWithPassword({
+                email: email,
+                password: password
+            });
 
-        if (!user) {
-            showMessage('loginMessage', 'Invalid email or password', 'error');
-            return;
+            if (authError) throw authError;
+
+            // Fetch user profile from database
+            const { data: userData, error: dbError } = await supabaseClient
+                .from('users')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+
+            if (dbError) throw dbError;
+
+            // Set up session
+            currentSession = session;
+            currentUser = userData;
+
+            showMessage('loginMessage', 'Login successful! Redirecting...', 'success');
+
+            setTimeout(() => {
+                window.location.href = 'inventory.html';
+            }, 1500);
+        } catch (error) {
+            showMessage('loginMessage', 'Login error: ' + error.message, 'error');
         }
-
-        localStorage.setItem('currentUser', JSON.stringify(user));
-        showMessage('loginMessage', 'Login successful! Redirecting...', 'success');
-
-        setTimeout(() => {
-            window.location.href = 'inventory.html';
-        }, 1500);
     });
 }
 
@@ -175,25 +251,23 @@ if (loginForm) {
 // PROFILE FUNCTIONALITY
 // ============================================
 
-function initializeProfilePage() {
-    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-    
-    if (!currentUser) {
+async function initializeProfilePage() {
+    if (!currentSession || !currentUser) {
         window.location.href = 'login.html';
         return;
     }
 
     // Display user info
-    document.getElementById('profileShopName').textContent = currentUser.shopName;
-    document.getElementById('profileUserId').textContent = currentUser.id;
+    document.getElementById('profileShopName').textContent = currentUser.shop_name;
+    document.getElementById('profileUserId').textContent = currentUser.display_id;
     document.getElementById('profileEmail').textContent = currentUser.email;
     document.getElementById('profilePhone').textContent = currentUser.phone;
 
-    const createdDate = new Date(currentUser.createdAt);
+    const createdDate = new Date(currentUser.created_at);
     document.getElementById('profileMemberSince').textContent = createdDate.getFullYear();
 
     // Display stats
-    updateProfileStats();
+    await updateProfileStats();
 
     // Handle password change
     const changePasswordForm = document.getElementById('changePasswordForm');
@@ -211,35 +285,36 @@ function initializeProfilePage() {
     setupConfirmModal();
 }
 
-function updateProfileStats() {
-    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-    const users = JSON.parse(localStorage.getItem('users')) || [];
-    const userIndex = users.findIndex(u => u.id === currentUser.id);
+async function updateProfileStats() {
+    if (!currentUser) return;
 
-    if (userIndex !== -1) {
-        const userProducts = users[userIndex].products || [];
-        const totalProducts = userProducts.length;
-        const totalItems = userProducts.reduce((sum, p) => sum + (p.quantity || 0), 0);
-        const totalValue = userProducts.reduce((sum, p) => sum + ((p.price || 0) * (p.quantity || 0)), 0);
+    try {
+        // Fetch products from database
+        const { data: products, error } = await supabaseClient
+            .from('products')
+            .select('*')
+            .eq('user_id', currentUser.id);
+
+        if (error) throw error;
+
+        const totalProducts = products.length;
+        const totalItems = products.reduce((sum, p) => sum + (p.quantity || 0), 0);
+        const totalValue = products.reduce((sum, p) => sum + ((p.price || 0) * (p.quantity || 0)), 0);
 
         document.getElementById('totalProducts').textContent = totalProducts;
         document.getElementById('totalItems').textContent = totalItems;
         document.getElementById('totalValue').textContent = '$' + totalValue.toFixed(2);
+    } catch (error) {
+        console.error('Error fetching stats:', error);
     }
 }
 
-function handlePasswordChange(e) {
+async function handlePasswordChange(e) {
     e.preventDefault();
 
-    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
     const oldPassword = document.getElementById('oldPassword').value;
     const newPassword = document.getElementById('newPassword').value;
     const confirmNewPassword = document.getElementById('confirmNewPassword').value;
-
-    if (oldPassword !== currentUser.password) {
-        showMessage('profileMessage', 'Current password is incorrect', 'error');
-        return;
-    }
 
     if (newPassword !== confirmNewPassword) {
         showMessage('profileMessage', 'New passwords do not match', 'error');
@@ -251,37 +326,57 @@ function handlePasswordChange(e) {
         return;
     }
 
-    // Update password
-    const users = JSON.parse(localStorage.getItem('users')) || [];
-    const userIndex = users.findIndex(u => u.id === currentUser.id);
-    if (userIndex !== -1) {
-        users[userIndex].password = newPassword;
-        currentUser.password = newPassword;
-        localStorage.setItem('users', JSON.stringify(users));
-        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    try {
+        // Update password using Supabase Auth
+        const { error } = await supabaseClient.auth.updateUser({
+            password: newPassword
+        });
+
+        if (error) throw error;
 
         showMessage('profileMessage', 'Password changed successfully', 'success');
         document.getElementById('changePasswordForm').reset();
+    } catch (error) {
+        showMessage('profileMessage', 'Password change error: ' + error.message, 'error');
     }
 }
 
-function handleDeleteAccount() {
+async function handleDeleteAccount() {
     const modal = document.getElementById('confirmModal');
     const confirmMessage = document.getElementById('confirmMessage');
     confirmMessage.textContent = 'Are you sure you want to delete your account? This action cannot be undone.';
     modal.classList.add('show');
 
-    document.getElementById('confirmYes').onclick = function() {
-        const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-        const users = JSON.parse(localStorage.getItem('users')) || [];
-        const filteredUsers = users.filter(u => u.id !== currentUser.id);
-        localStorage.setItem('users', JSON.stringify(filteredUsers));
-        localStorage.removeItem('currentUser');
+    document.getElementById('confirmYes').onclick = async function() {
+        try {
+            // Delete products first
+            await supabaseClient
+                .from('products')
+                .delete()
+                .eq('user_id', currentUser.id);
 
-        showMessage('profileMessage', 'Account deleted. Redirecting...', 'success');
-        setTimeout(() => {
-            window.location.href = 'index.html';
-        }, 2000);
+            // Delete user profile
+            await supabaseClient
+                .from('users')
+                .delete()
+                .eq('id', currentUser.id);
+
+            // Delete auth user
+            await supabaseClient.auth.admin.deleteUser(currentUser.id);
+
+            // Sign out
+            await supabaseClient.auth.signOut();
+
+            currentSession = null;
+            currentUser = null;
+
+            showMessage('profileMessage', 'Account deleted. Redirecting...', 'success');
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 2000);
+        } catch (error) {
+            showMessage('profileMessage', 'Delete error: ' + error.message, 'error');
+        }
     };
 }
 
@@ -306,10 +401,10 @@ function setupConfirmModal() {
 // INVENTORY FUNCTIONALITY
 // ============================================
 
-function initializeInventoryPage() {
-    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-    
-    if (!currentUser) {
+let allProducts = [];
+
+async function initializeInventoryPage() {
+    if (!currentSession || !currentUser) {
         window.location.href = 'login.html';
         return;
     }
@@ -336,90 +431,98 @@ function initializeInventoryPage() {
     setupEditModal();
 
     // Display products
-    displayProducts();
+    await displayProducts();
     updateCategoryOptions();
 }
 
-function handleAddProduct(e) {
+async function handleAddProduct(e) {
     e.preventDefault();
 
-    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-    const users = JSON.parse(localStorage.getItem('users')) || [];
-    const userIndex = users.findIndex(u => u.id === currentUser.id);
+    const productName = document.getElementById('productName').value.trim();
+    const productDescription = document.getElementById('productDescription').value.trim();
+    const productPrice = parseFloat(document.getElementById('productPrice').value);
+    const productQuantity = parseInt(document.getElementById('productQuantity').value);
+    const productCategory = document.getElementById('productCategory').value.trim();
 
-    if (userIndex === -1) return;
-
-    const product = {
-        id: 'PROD-' + Date.now(),
-        name: document.getElementById('productName').value.trim(),
-        description: document.getElementById('productDescription').value.trim(),
-        price: parseFloat(document.getElementById('productPrice').value),
-        quantity: parseInt(document.getElementById('productQuantity').value),
-        category: document.getElementById('productCategory').value.trim(),
-        createdAt: new Date().toISOString()
-    };
-
-    if (!product.name || !product.price) {
+    if (!productName || !productPrice) {
         showMessage('inventoryMessage', 'Please fill in required fields', 'error');
         return;
     }
 
-    if (!users[userIndex].products) {
-        users[userIndex].products = [];
+    try {
+        // Insert product into database
+        const { data, error } = await supabaseClient
+            .from('products')
+            .insert([{
+                user_id: currentUser.id,
+                name: productName,
+                description: productDescription,
+                price: productPrice,
+                quantity: productQuantity,
+                category: productCategory,
+                created_at: new Date().toISOString()
+            }])
+            .select();
+
+        if (error) throw error;
+
+        showMessage('inventoryMessage', 'Product added successfully!', 'success');
+        e.target.reset();
+        await displayProducts();
+        updateCategoryOptions();
+        await updateProfileStats();
+    } catch (error) {
+        showMessage('inventoryMessage', 'Add product error: ' + error.message, 'error');
     }
-
-    users[userIndex].products.push(product);
-    localStorage.setItem('users', JSON.stringify(users));
-
-    // Update current user
-    currentUser.products = users[userIndex].products;
-    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-
-    showMessage('inventoryMessage', 'Product added successfully!', 'success');
-    e.target.reset();
-    displayProducts();
-    updateCategoryOptions();
-    updateProfileStats();
 }
 
-function displayProducts() {
-    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-    const users = JSON.parse(localStorage.getItem('users')) || [];
-    const userIndex = users.findIndex(u => u.id === currentUser.id);
+async function displayProducts() {
+    if (!currentUser) return;
 
-    const productsBody = document.getElementById('productsBody');
-    const noProducts = document.getElementById('noProducts');
-    const products = users[userIndex]?.products || [];
+    try {
+        // Fetch products from database
+        const { data: products, error } = await supabaseClient
+            .from('products')
+            .select('*')
+            .eq('user_id', currentUser.id)
+            .order('created_at', { ascending: false });
 
-    if (products.length === 0) {
-        productsBody.innerHTML = '';
-        noProducts.style.display = 'block';
-        return;
+        if (error) throw error;
+
+        allProducts = products;
+
+        const productsBody = document.getElementById('productsBody');
+        const noProducts = document.getElementById('noProducts');
+
+        if (!products || products.length === 0) {
+            productsBody.innerHTML = '';
+            noProducts.style.display = 'block';
+            return;
+        }
+
+        noProducts.style.display = 'none';
+        productsBody.innerHTML = products.map(product => `
+            <tr>
+                <td>${product.id}</td>
+                <td>${product.name}</td>
+                <td>${product.category || '-'}</td>
+                <td>$${product.price.toFixed(2)}</td>
+                <td>${product.quantity}</td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-edit" onclick="editProduct(${product.id})">Edit</button>
+                        <button class="btn-delete" onclick="deleteProduct(${product.id})">Delete</button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        showMessage('inventoryMessage', 'Load products error: ' + error.message, 'error');
     }
-
-    noProducts.style.display = 'none';
-    productsBody.innerHTML = products.map(product => `
-        <tr>
-            <td>${product.id}</td>
-            <td>${product.name}</td>
-            <td>${product.category || '-'}</td>
-            <td>$${product.price.toFixed(2)}</td>
-            <td>${product.quantity}</td>
-            <td>
-                <div class="action-buttons">
-                    <button class="btn-edit" onclick="editProduct('${product.id}')">Edit</button>
-                    <button class="btn-delete" onclick="deleteProduct('${product.id}')">Delete</button>
-                </div>
-            </td>
-        </tr>
-    `).join('');
 }
 
-function editProduct(productId) {
-    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-    const users = JSON.parse(localStorage.getItem('users')) || [];
-    const userIndex = users.findIndex(u => u.id === currentUser.id);
-    const product = users[userIndex].products.find(p => p.id === productId);
+async function editProduct(productId) {
+    const product = allProducts.find(p => p.id === productId);
 
     if (!product) return;
 
@@ -434,23 +537,24 @@ function editProduct(productId) {
     modal.classList.add('show');
 }
 
-function deleteProduct(productId) {
+async function deleteProduct(productId) {
     if (!confirm('Are you sure you want to delete this product?')) return;
 
-    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-    const users = JSON.parse(localStorage.getItem('users')) || [];
-    const userIndex = users.findIndex(u => u.id === currentUser.id);
+    try {
+        const { error } = await supabaseClient
+            .from('products')
+            .delete()
+            .eq('id', productId);
 
-    users[userIndex].products = users[userIndex].products.filter(p => p.id !== productId);
-    localStorage.setItem('users', JSON.stringify(users));
+        if (error) throw error;
 
-    currentUser.products = users[userIndex].products;
-    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-
-    showMessage('inventoryMessage', 'Product deleted successfully!', 'success');
-    displayProducts();
-    updateCategoryOptions();
-    updateProfileStats();
+        showMessage('inventoryMessage', 'Product deleted successfully!', 'success');
+        await displayProducts();
+        updateCategoryOptions();
+        await updateProfileStats();
+    } catch (error) {
+        showMessage('inventoryMessage', 'Delete product error: ' + error.message, 'error');
+    }
 }
 
 function setupEditModal() {
@@ -471,46 +575,46 @@ function setupEditModal() {
     });
 
     if (editForm) {
-        editForm.addEventListener('submit', function(e) {
+        editForm.addEventListener('submit', async function(e) {
             e.preventDefault();
 
-            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-            const users = JSON.parse(localStorage.getItem('users')) || [];
-            const userIndex = users.findIndex(u => u.id === currentUser.id);
             const productId = document.getElementById('editProductId').value;
-            const productIndex = users[userIndex].products.findIndex(p => p.id === productId);
+            const productName = document.getElementById('editProductName').value.trim();
+            const productDescription = document.getElementById('editProductDescription').value.trim();
+            const productPrice = parseFloat(document.getElementById('editProductPrice').value);
+            const productQuantity = parseInt(document.getElementById('editProductQuantity').value);
+            const productCategory = document.getElementById('editProductCategory').value.trim();
 
-            if (productIndex !== -1) {
-                users[userIndex].products[productIndex] = {
-                    ...users[userIndex].products[productIndex],
-                    name: document.getElementById('editProductName').value.trim(),
-                    description: document.getElementById('editProductDescription').value.trim(),
-                    price: parseFloat(document.getElementById('editProductPrice').value),
-                    quantity: parseInt(document.getElementById('editProductQuantity').value),
-                    category: document.getElementById('editProductCategory').value.trim()
-                };
+            try {
+                const { error } = await supabaseClient
+                    .from('products')
+                    .update({
+                        name: productName,
+                        description: productDescription,
+                        price: productPrice,
+                        quantity: productQuantity,
+                        category: productCategory
+                    })
+                    .eq('id', productId);
 
-                localStorage.setItem('users', JSON.stringify(users));
-                currentUser.products = users[userIndex].products;
-                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                if (error) throw error;
 
                 showMessage('inventoryMessage', 'Product updated successfully!', 'success');
                 editModal.classList.remove('show');
-                displayProducts();
-                updateProfileStats();
+                await displayProducts();
+                updateCategoryOptions();
+                await updateProfileStats();
+            } catch (error) {
+                showMessage('inventoryMessage', 'Update product error: ' + error.message, 'error');
             }
         });
     }
 }
 
-function handleSearch(e) {
+async function handleSearch(e) {
     const searchTerm = e.target.value.toLowerCase();
-    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-    const users = JSON.parse(localStorage.getItem('users')) || [];
-    const userIndex = users.findIndex(u => u.id === currentUser.id);
-    const products = users[userIndex]?.products || [];
-
-    const filtered = products.filter(p => 
+    
+    const filtered = allProducts.filter(p => 
         p.name.toLowerCase().includes(searchTerm) ||
         p.description.toLowerCase().includes(searchTerm)
     );
@@ -518,16 +622,12 @@ function handleSearch(e) {
     displayFilteredProducts(filtered);
 }
 
-function handleCategoryFilter(e) {
+async function handleCategoryFilter(e) {
     const selectedCategory = e.target.value;
-    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-    const users = JSON.parse(localStorage.getItem('users')) || [];
-    const userIndex = users.findIndex(u => u.id === currentUser.id);
-    const products = users[userIndex]?.products || [];
-
+    
     const filtered = selectedCategory ? 
-        products.filter(p => p.category === selectedCategory) : 
-        products;
+        allProducts.filter(p => p.category === selectedCategory) : 
+        allProducts;
 
     displayFilteredProducts(filtered);
 }
@@ -552,8 +652,8 @@ function displayFilteredProducts(products) {
             <td>${product.quantity}</td>
             <td>
                 <div class="action-buttons">
-                    <button class="btn-edit" onclick="editProduct('${product.id}')">Edit</button>
-                    <button class="btn-delete" onclick="deleteProduct('${product.id}')">Delete</button>
+                    <button class="btn-edit" onclick="editProduct(${product.id})">Edit</button>
+                    <button class="btn-delete" onclick="deleteProduct(${product.id})">Delete</button>
                 </div>
             </td>
         </tr>
@@ -561,12 +661,7 @@ function displayFilteredProducts(products) {
 }
 
 function updateCategoryOptions() {
-    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
-    const users = JSON.parse(localStorage.getItem('users')) || [];
-    const userIndex = users.findIndex(u => u.id === currentUser.id);
-    const products = users[userIndex]?.products || [];
-
-    const categories = [...new Set(products.map(p => p.category).filter(Boolean))];
+    const categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))];
     const categoryFilter = document.getElementById('categoryFilter');
 
     if (categoryFilter) {

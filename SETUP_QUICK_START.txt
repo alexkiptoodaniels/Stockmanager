@@ -1,0 +1,210 @@
+═════════════════════════════════════════════════════════════════════════════════
+  STOCK MANAGEMENT SYSTEM - SUPABASE QUICK START GUIDE
+═════════════════════════════════════════════════════════════════════════════════
+
+📋 QUICK SETUP (5 MINUTES)
+═════════════════════════════════════════════════════════════════════════════════
+
+STEP 1: CREATE SUPABASE PROJECT
+  1. Go to https://supabase.com
+  2. Sign up (free)
+  3. Create new project
+  4. Wait 2-3 minutes for project creation
+
+STEP 2: COPY CREDENTIALS
+  1. Open Supabase dashboard
+  2. Go to Settings → API
+  3. Copy "Project URL"
+  4. Copy "Anon Key"
+  5. Open script.js in your project folder
+  6. Find lines 8-9 and replace:
+     OLD: const SUPABASE_URL = 'https://your-project-url.supabase.co';
+     OLD: const SUPABASE_ANON_KEY = 'your-anon-key';
+     
+     NEW: const SUPABASE_URL = 'YOUR_ACTUAL_PROJECT_URL';
+     NEW: const SUPABASE_ANON_KEY = 'YOUR_ACTUAL_ANON_KEY';
+  7. Save script.js
+
+STEP 3: CREATE TABLES
+  1. In Supabase, go to SQL Editor
+  2. Click "New Query"
+  3. Copy-paste this code:
+
+═════════════════════════════════════════════════════════════════════════════════
+SQL CODE TO CREATE TABLES
+═════════════════════════════════════════════════════════════════════════════════
+
+-- Create Users Table
+CREATE TABLE public.users (
+  id UUID PRIMARY KEY REFERENCES auth.users(id),
+  email TEXT UNIQUE NOT NULL,
+  phone TEXT NOT NULL,
+  shop_name TEXT NOT NULL,
+  display_id TEXT UNIQUE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create Products Table
+CREATE TABLE public.products (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  price DECIMAL(10, 2) NOT NULL,
+  quantity INTEGER NOT NULL DEFAULT 0,
+  category TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create Index for Performance
+CREATE INDEX idx_products_user_id ON public.products(user_id);
+
+-- Enable Row Level Security
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS Policies for Users
+CREATE POLICY "Users can view own profile"
+ON public.users FOR SELECT
+USING (auth.uid() = id);
+
+CREATE POLICY "Users can update own profile"
+ON public.users FOR UPDATE
+USING (auth.uid() = id);
+
+-- Create RLS Policies for Products
+CREATE POLICY "Users can view own products"
+ON public.products FOR SELECT
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own products"
+ON public.products FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own products"
+ON public.products FOR UPDATE
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own products"
+ON public.products FOR DELETE
+USING (auth.uid() = user_id);
+
+═════════════════════════════════════════════════════════════════════════════════
+
+  4. Click "Run"
+  5. Wait for success message
+
+STEP 4: ENABLE EMAIL SIGNUP
+  1. Go to Authentication → Providers
+  2. Make sure "Email" is enabled
+  3. Optional: Turn on "Autoconfirm New Users" for testing
+  4. Click Save
+
+STEP 5: TEST YOUR APP
+  1. Open index.html in browser
+  2. Click "Sign Up"
+  3. Create test account
+  4. Should redirect to profile page
+  5. Click "Inventory" and add a product
+  6. Product should appear immediately
+
+DONE! ✅
+═════════════════════════════════════════════════════════════════════════════════
+
+📁 FILES & WHAT THEY DO
+═════════════════════════════════════════════════════════════════════════════════
+
+index.html           → Home page (landing page)
+signup.html          → User registration page
+login.html           → User login page
+inventory.html       → Product management dashboard
+profile.html         → User profile & settings
+style.css            → All CSS styling (light/dark theme)
+script.js            → ALL JavaScript with Supabase integration
+README.md            → Full documentation in markdown
+DOCUMENTATION.js     → Full documentation as comments (no code)
+SUPABASE_SETUP.md    → Detailed Supabase setup guide
+SETUP_QUICK_START    → This file
+
+🚀 KEY FEATURES
+═════════════════════════════════════════════════════════════════════════════════
+
+✓ User authentication with Supabase Auth
+✓ User profiles stored in Supabase database
+✓ Product/inventory stored in Supabase database
+✓ Real-time product management
+✓ Search and filter products
+✓ Light/Dark theme toggle
+✓ Responsive design (mobile/tablet/desktop)
+✓ Auto-calculated inventory statistics
+✓ Secure row-level access control
+
+🔧 WHAT'S INTEGRATED
+═════════════════════════════════════════════════════════════════════════════════
+
+SUPABASE FEATURES USED:
+- Auth API → User signup/login
+- Database API → Store/retrieve users and products
+- Row Level Security → Secure data access
+- PostgreSQL Database → Persistent storage
+
+LOCAL FEATURES:
+- localStorage → Theme preference storage
+- JavaScript → All app logic
+- CSS Variables → Dynamic theming
+
+⚠️ IMPORTANT NOTES
+═════════════════════════════════════════════════════════════════════════════════
+
+1. DO update script.js with your Supabase credentials (lines 8-9)
+2. DO create both database tables (users and products)
+3. DO enable Row Level Security for data safety
+4. DO keep your Anon Key private
+5. DON'T share credentials in public repositories
+6. DON'T change table or column names from setup SQL
+
+🎯 TROUBLESHOOTING
+═════════════════════════════════════════════════════════════════════════════════
+
+ERROR: "401 Unauthorized"
+→ Check SUPABASE_URL and SUPABASE_ANON_KEY in script.js
+
+ERROR: "Relation 'public.users' does not exist"
+→ Run the CREATE TABLE SQL in Supabase SQL Editor
+
+ERROR: "User already exists"
+→ Use different email or delete test user in Supabase
+
+ERROR: No data showing
+→ Make sure RLS policies are created
+
+For more help, see SUPABASE_SETUP.md
+
+🌐 FOLDER STRUCTURE
+═════════════════════════════════════════════════════════════════════════════════
+
+project-folder/
+├── index.html
+├── signup.html
+├── login.html
+├── inventory.html
+├── profile.html
+├── style.css
+├── script.js
+├── README.md
+├── DOCUMENTATION.js
+├── SUPABASE_SETUP.md
+└── SETUP_QUICK_START.txt  ← You are here
+
+✅ READY TO GO!
+═════════════════════════════════════════════════════════════════════════════════
+
+1. Complete steps 1-5 above
+2. Open index.html in browser
+3. Sign up with test account
+4. Start using the system!
+
+Questions? Check SUPABASE_SETUP.md for detailed instructions.
+
+Good luck! 🚀
+═════════════════════════════════════════════════════════════════════════════════
